@@ -115,9 +115,16 @@ func sprintDims(ds []types.Dimension) (out string) {
 }
 
 func (c collector) collectBatch(ch chan<- prometheus.Metric, metrics []types.Metric) {
+	// FIXME: API call fails when MetricDataQueries is empty but we might
+	// want to avoid that situation in the first place
+	if len(metrics) == 0 {
+		return
+	}
 	results, err := c.reporter.GetMetricsResults(metrics)
 	if err != nil {
-		panic(err)
+		level.Error(c.logger).Log("msg", "failed to get metric results", "err", err)
+		ch <- prometheus.NewInvalidMetric(c.errDesc, err)
+		return
 	}
 	nr := len(results)
 	nm := len(metrics)

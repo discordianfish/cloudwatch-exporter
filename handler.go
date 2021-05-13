@@ -15,29 +15,18 @@ import (
 )
 
 type handler struct {
-	pathPrefix string
-	logger     log.Logger
-	requests   *prometheus.CounterVec
-	errors     prometheus.Counter
-	duration   *prometheus.SummaryVec
+	pathPrefix      string
+	logger          log.Logger
+	errorCounter    prometheus.Counter
+	durationSummary *prometheus.SummaryVec
 }
 
-func newHandler(logger log.Logger, pathPrefix string) *handler {
+func newHandler(logger log.Logger, pathPrefix string, durationSummary *prometheus.SummaryVec, errorCounter prometheus.Counter) *handler {
 	return &handler{
-		pathPrefix: pathPrefix,
-		logger:     logger,
-		requests: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "cloudwatch_requests_total",
-			Help: "API requests made to CloudWatch",
-		}, []string{"action", "namespace"}),
-		duration: prometheus.NewSummaryVec(prometheus.SummaryOpts{
-			Name: "cloudwatch_request_duration_seconds",
-			Help: "Duration of cloudwatch metric collection.",
-		}, []string{"namespace", "name"}),
-		errors: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "cloudwatch_errors_total",
-			Help: "Number of errors.",
-		}),
+		pathPrefix:      pathPrefix,
+		logger:          logger,
+		errorCounter:    errorCounter,
+		durationSummary: durationSummary,
 	}
 }
 
@@ -99,12 +88,12 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	namespace, metricName := h.parsePath(r.URL.Path)
 	if namespace == "" {
-		h.errors.Inc()
+		h.errorCounter.Inc()
 		http.Error(w, "Namespace required", http.StatusBadRequest)
 		return
 	}
 	if metricName == "" {
-		h.errors.Inc()
+		h.errorCounter.Inc()
 		http.Error(w, "Metric name required", http.StatusBadRequest)
 		return
 	}
@@ -112,13 +101,13 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	config, err := configFromQuery(r.URL.Query())
 	if err != nil {
-		h.errors.Inc()
+		h.errorCounter.Inc()
 		http.Error(w, "Invalid query: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	reporter, err := newReporter(h.logger, h.requests, config)
+	reporter, err := newReporter(h.logger, config)
 	if err != nil {
-		h.errors.Inc()
+		h.errorCounter.Inc()
 		level.Error(h.logger).Log("msg", "Couldn't create reporter", "err", err.Error())
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
@@ -126,10 +115,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := newCollector(logger, reporter, namespace, metricName)
 
 	registry := prometheus.NewRegistry()
-	registry.MustRegister(h.requests)
-	registry.MustRegister(h.errors)
-	registry.MustRegister(h.duration)
 	registry.MustRegister(c)
 	promhttp.HandlerFor(registry, promhttp.HandlerOpts{}).ServeHTTP(w, r)
-	h.duration.WithLabelValues(namespace, metricName).Observe(time.Since(start).Seconds())
+	h.durationSummary.WithLabelValues(namespace, metricName).Observe(time.Since(start).Seconds())
 }

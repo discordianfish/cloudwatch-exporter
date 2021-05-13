@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/go-kit/kit/log"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 type reporterConfig struct {
@@ -24,11 +23,10 @@ type reporter struct {
 	config *reporterConfig
 	cloudwatch.ListMetricsAPIClient
 	cloudwatch.GetMetricDataAPIClient
-	logger   log.Logger
-	requests *prometheus.CounterVec
+	logger log.Logger
 }
 
-func newReporter(logger log.Logger, requests *prometheus.CounterVec, rconfig *reporterConfig) (*reporter, error) {
+func newReporter(logger log.Logger, rconfig *reporterConfig) (*reporter, error) {
 	cwc, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		return nil, err
@@ -40,7 +38,6 @@ func newReporter(logger log.Logger, requests *prometheus.CounterVec, rconfig *re
 		ListMetricsAPIClient:   client,
 		GetMetricDataAPIClient: client,
 		logger:                 logger,
-		requests:               requests,
 	}, nil
 }
 

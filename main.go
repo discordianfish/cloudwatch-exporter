@@ -56,7 +56,7 @@ func main() {
 		durationSummary = prometheus.NewSummaryVec(prometheus.SummaryOpts{
 			Name: "cloudwatch_request_duration_seconds",
 			Help: "Duration of cloudwatch metric collection.",
-		}, []string{"namespace", "name"})
+		}, []string{"metric_namespace", "metric_name"})
 		errorCounter = prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "cloudwatch_errors_total",
 			Help: "Number of errors.",

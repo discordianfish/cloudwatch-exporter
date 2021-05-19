@@ -23,20 +23,16 @@ var (
 type collector struct {
 	logger log.Logger
 	*reporter
-	namespace  string
-	metricName string
-	descMap    map[string]*prometheus.Desc
-	errDesc    *prometheus.Desc
+	descMap map[string]*prometheus.Desc
+	errDesc *prometheus.Desc
 }
 
-func newCollector(logger log.Logger, reporter *reporter, namespace, metricName string) *collector {
+func newCollector(logger log.Logger, reporter *reporter) *collector {
 	return &collector{
-		logger:     logger,
-		reporter:   reporter,
-		namespace:  namespace,
-		metricName: metricName,
-		descMap:    make(map[string]*prometheus.Desc),
-		errDesc:    prometheus.NewDesc("cloudwatch_error", "Error collecting metrics", nil, nil),
+		logger:   logger,
+		reporter: reporter,
+		descMap:  make(map[string]*prometheus.Desc),
+		errDesc:  prometheus.NewDesc("cloudwatch_error", "Error collecting metrics", nil, nil),
 	}
 }
 
@@ -47,7 +43,7 @@ func (c collector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect implements Prometheus.Collector.
 func (c collector) Collect(ch chan<- prometheus.Metric) {
-	metrics, err := c.reporter.ListMetrics(c.namespace, c.metricName)
+	metrics, err := c.reporter.ListMetrics()
 	if err != nil {
 		level.Error(c.logger).Log("msg", "failed to list metrics", "err", err)
 		ch <- prometheus.NewInvalidMetric(c.errDesc, err)

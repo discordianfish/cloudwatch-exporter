@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/go-kit/kit/log"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type reporterConfig struct {
@@ -20,13 +21,16 @@ type reporterConfig struct {
 }
 
 type reporter struct {
-	config *reporterConfig
+	config     *reporterConfig
+	namespace  string // FIXME: move to config?
+	metricName string
 	cloudwatch.ListMetricsAPIClient
 	cloudwatch.GetMetricDataAPIClient
-	logger log.Logger
+	logger          log.Logger
+	durationSummary *prometheus.SummaryVec
 }
 
-func newReporter(logger log.Logger, rconfig *reporterConfig) (*reporter, error) {
+func newReporter(logger log.Logger, rconfig *reporterConfig, durationSummary *prometheus.SummaryVec) (*reporter, error) {
 	cwc, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		return nil, err
@@ -38,25 +42,28 @@ func newReporter(logger log.Logger, rconfig *reporterConfig) (*reporter, error) 
 		ListMetricsAPIClient:   client,
 		GetMetricDataAPIClient: client,
 		logger:                 logger,
+		durationSummary:        durationSummary,
 	}, nil
 }
 
-func (c *reporter) ListMetrics(namespace, metricName string) ([]types.Metric, error) {
+func (c *reporter) ListMetrics() ([]types.Metric, error) {
 	input := &cloudwatch.ListMetricsInput{}
-	if metricName != "*" {
-		input.MetricName = &metricName
+	if c.metricName != "*" {
+		input.MetricName = &c.metricName
 	}
-	if namespace != "*" {
-		input.Namespace = &namespace
+	if c.namespace != "*" {
+		input.Namespace = &c.namespace
 	}
 
 	p := cloudwatch.NewListMetricsPaginator(c.ListMetricsAPIClient, input)
 	metrics := []types.Metric{}
 	for p.HasMorePages() {
+		start := time.Now()
 		results, err := p.NextPage(context.TODO())
 		if err != nil {
 			return nil, err
 		}
+		c.durationSummary.WithLabelValues(c.namespace, c.metricName, "ListMetrics").Observe(time.Since(start).Seconds())
 		metrics = append(metrics, results.Metrics...)
 	}
 
@@ -92,10 +99,12 @@ func (c *reporter) GetMetricsResults(metrics []types.Metric) ([]types.MetricData
 		})
 
 	for p.HasMorePages() {
+		start := time.Now()
 		r, err := p.NextPage(context.TODO())
 		if err != nil {
 			return nil, err
 		}
+		c.durationSummary.WithLabelValues(c.namespace, c.metricName, "GetMetricsResults").Observe(time.Since(start).Seconds())
 		results = append(results, r.MetricDataResults...)
 	}
 	return results, nil

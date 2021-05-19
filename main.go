@@ -57,6 +57,10 @@ func main() {
 			Name: "cloudwatch_request_duration_seconds",
 			Help: "Duration of cloudwatch metric collection.",
 		}, []string{"metric_namespace", "metric_name"})
+		reporterDurationSummary = prometheus.NewSummaryVec(prometheus.SummaryOpts{
+			Name: "cloudwatch_reporter_request_duration_seconds",
+			Help: "Duration of cloudwatch metric collection.",
+		}, []string{"metric_namespace", "metric_name", "api_call"})
 		errorCounter = prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "cloudwatch_errors_total",
 			Help: "Number of errors.",
@@ -71,6 +75,7 @@ func main() {
 
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(durationSummary)
+	registry.MustRegister(reporterDurationSummary)
 	registry.MustRegister(errorCounter)
 
 	var (
@@ -83,7 +88,7 @@ func main() {
 		metricsMux    = http.NewServeMux()
 		metricsServer = http.Server{Handler: metricsMux, Addr: *listenAddress}
 	)
-	metricsMux.Handle(*metricsPath, newHandler(logger, *metricsPath, durationSummary, errorCounter))
+	metricsMux.Handle(*metricsPath, newHandler(logger, *metricsPath, durationSummary, errorCounter, reporterDurationSummary))
 	metricsMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
 			<head><title>Cloudwatch Exporter</title></head>

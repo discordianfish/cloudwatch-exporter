@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/discordianfish/cloudwatch-exporter/mock"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func TestReporter(t *testing.T) {
@@ -18,11 +19,6 @@ func TestReporter(t *testing.T) {
 	}
 	client.InsertRandom("AWS/EBS", "VolumeWriteBytes", count)
 
-	reporter := &reporter{
-		ListMetricsAPIClient:   client,
-		GetMetricDataAPIClient: client,
-	}
-
 	for _, tc := range []struct {
 		namespace  string
 		metricName string
@@ -34,7 +30,17 @@ func TestReporter(t *testing.T) {
 		{"AWS/EBS", "*", count},
 		{"*", "*", count * (len(metricNames) + 1)}, // Also returns the EBS metric
 	} {
-		metrics, err := reporter.ListMetrics(tc.namespace, tc.metricName)
+		reporter := &reporter{
+			ListMetricsAPIClient:   client,
+			GetMetricDataAPIClient: client,
+			namespace:              tc.namespace,
+			metricName:             tc.metricName,
+			durationSummary: prometheus.NewSummaryVec(prometheus.SummaryOpts{
+				Name: "cloudwatch_request_duration_seconds",
+				Help: "Duration of cloudwatch metric collection.",
+			}, []string{"metric_namespace", "metric_name", "api_call"}),
+		}
+		metrics, err := reporter.ListMetrics()
 		if err != nil {
 			t.Fatal(err)
 		}

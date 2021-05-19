@@ -15,18 +15,20 @@ import (
 )
 
 type handler struct {
-	pathPrefix      string
-	logger          log.Logger
-	errorCounter    prometheus.Counter
-	durationSummary *prometheus.SummaryVec
+	pathPrefix              string
+	logger                  log.Logger
+	errorCounter            prometheus.Counter
+	durationSummary         *prometheus.SummaryVec
+	reporterDurationSummary *prometheus.SummaryVec
 }
 
-func newHandler(logger log.Logger, pathPrefix string, durationSummary *prometheus.SummaryVec, errorCounter prometheus.Counter) *handler {
+func newHandler(logger log.Logger, pathPrefix string, durationSummary *prometheus.SummaryVec, errorCounter prometheus.Counter, reporterDurationSummary *prometheus.SummaryVec) *handler {
 	return &handler{
-		pathPrefix:      pathPrefix,
-		logger:          logger,
-		errorCounter:    errorCounter,
-		durationSummary: durationSummary,
+		pathPrefix:              pathPrefix,
+		logger:                  logger,
+		errorCounter:            errorCounter,
+		durationSummary:         durationSummary,
+		reporterDurationSummary: reporterDurationSummary,
 	}
 }
 
@@ -105,14 +107,16 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid query: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	reporter, err := newReporter(h.logger, config)
+	reporter, err := newReporter(h.logger, config, h.reporterDurationSummary)
 	if err != nil {
 		h.errorCounter.Inc()
 		level.Error(h.logger).Log("msg", "Couldn't create reporter", "err", err.Error())
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
 	}
-	c := newCollector(logger, reporter, namespace, metricName)
+	reporter.namespace = namespace
+	reporter.metricName = metricName
+	c := newCollector(logger, reporter)
 
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(c)

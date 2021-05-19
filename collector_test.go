@@ -23,16 +23,6 @@ func TestCollector(t *testing.T) {
 	}
 	client.InsertRandom("AWS/EBS", "VolumeWriteBytes", count)
 
-	reporter := &reporter{
-		ListMetricsAPIClient:   client,
-		GetMetricDataAPIClient: client,
-		config: &reporterConfig{
-			delayDuration: 600 * time.Second,
-			rangeDuration: 600 * time.Second,
-			period:        60,
-			stat:          "Maximum",
-		},
-	}
 	logger := log.NewLogfmtLogger(log.NewSyncWriter(os.Stdout))
 	for _, tc := range []struct {
 		namespace  string
@@ -45,7 +35,23 @@ func TestCollector(t *testing.T) {
 		{"AWS/EBS", "*", count},
 		{"*", "*", count * (len(metricNames) + 1)}, // Also returns the EBS metric
 	} {
-		collector := newCollector(logger, reporter, tc.namespace, tc.metricName)
+		reporter := &reporter{
+			ListMetricsAPIClient:   client,
+			GetMetricDataAPIClient: client,
+			config: &reporterConfig{
+				delayDuration: 600 * time.Second,
+				rangeDuration: 600 * time.Second,
+				period:        60,
+				stat:          "Maximum",
+			},
+			namespace:  tc.namespace,
+			metricName: tc.metricName,
+			durationSummary: prometheus.NewSummaryVec(prometheus.SummaryOpts{
+				Name: "cloudwatch_request_duration_seconds",
+				Help: "Duration of cloudwatch metric collection.",
+			}, []string{"metric_namespace", "metric_name", "api_call"}),
+		}
+		collector := newCollector(logger, reporter) // , tc.namespace, tc.metricName)
 
 		metrics := []prometheus.Metric{}
 

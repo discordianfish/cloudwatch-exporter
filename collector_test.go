@@ -51,7 +51,12 @@ func TestCollector(t *testing.T) {
 				Help: "Duration of cloudwatch metric collection.",
 			}, []string{"metric_namespace", "metric_name", "api_call"}),
 		}
-		collector := newCollector(logger, reporter) // , tc.namespace, tc.metricName)
+		collector := newCollector(logger, reporter,
+			prometheus.NewCounter(prometheus.CounterOpts{
+				Name: "cloudwatch_errors_total",
+				Help: "Number of errors.",
+			}),
+		)
 
 		metrics := []prometheus.Metric{}
 

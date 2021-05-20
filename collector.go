@@ -23,16 +23,18 @@ var (
 type collector struct {
 	logger log.Logger
 	*reporter
-	descMap map[string]*prometheus.Desc
-	errDesc *prometheus.Desc
+	descMap      map[string]*prometheus.Desc
+	errorCounter prometheus.Counter
+	errDesc      *prometheus.Desc
 }
 
-func newCollector(logger log.Logger, reporter *reporter) *collector {
+func newCollector(logger log.Logger, reporter *reporter, errorCounter prometheus.Counter) *collector {
 	return &collector{
-		logger:   logger,
-		reporter: reporter,
-		descMap:  make(map[string]*prometheus.Desc),
-		errDesc:  prometheus.NewDesc("cloudwatch_error", "Error collecting metrics", nil, nil),
+		logger:       logger,
+		reporter:     reporter,
+		descMap:      make(map[string]*prometheus.Desc),
+		errDesc:      prometheus.NewDesc("cloudwatch_error", "Error collecting metrics", nil, nil),
+		errorCounter: errorCounter,
 	}
 }
 
@@ -46,6 +48,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 	metrics, err := c.reporter.ListMetrics()
 	if err != nil {
 		level.Error(c.logger).Log("msg", "failed to list metrics", "err", err)
+		c.errorCounter.Inc()
 		ch <- prometheus.NewInvalidMetric(c.errDesc, err)
 		return
 	}
@@ -119,6 +122,7 @@ func (c collector) collectBatch(ch chan<- prometheus.Metric, metrics []types.Met
 	results, err := c.reporter.GetMetricsResults(metrics)
 	if err != nil {
 		level.Error(c.logger).Log("msg", "failed to get metric results", "err", err)
+		c.errorCounter.Inc()
 		ch <- prometheus.NewInvalidMetric(c.errDesc, err)
 		return
 	}

@@ -116,7 +116,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	reporter.namespace = namespace
 	reporter.metricName = metricName
-	c := newCollector(logger, reporter)
+	c := newCollector(logger, reporter, h.errorCounter)
 
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(c)

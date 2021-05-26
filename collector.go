@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/go-kit/kit/log"
@@ -26,6 +27,7 @@ type collector struct {
 	descMap      map[string]*prometheus.Desc
 	errorCounter prometheus.Counter
 	errDesc      *prometheus.Desc
+	concurrency  int
 }
 
 func newCollector(logger log.Logger, reporter *reporter, errorCounter prometheus.Counter) *collector {
@@ -35,6 +37,7 @@ func newCollector(logger log.Logger, reporter *reporter, errorCounter prometheus
 		descMap:      make(map[string]*prometheus.Desc),
 		errDesc:      prometheus.NewDesc("cloudwatch_error", "Error collecting metrics", nil, nil),
 		errorCounter: errorCounter,
+		concurrency:  10,
 	}
 }
 
@@ -62,6 +65,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 	var (
 		batch = make([]types.Metric, length, batchSize)
 		i     = 0
+		sem   = make(chan bool, c.concurrency)
 	)
 	for _, metric := range metrics {
 		batch[i] = metric
@@ -70,9 +74,21 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 		i = 0
-		c.collectBatch(ch, batch)
+		sem <- true
+		go func(batch []types.Metric) {
+			c.collectBatch(ch, batch)
+			<-sem
+		}(batch)
 	}
-	c.collectBatch(ch, batch[:i]) // The length of the array might be bigger than the number of entries when processing more than one batch
+	// The length of the array might be bigger than the number of entries when processing more than one batch
+	sem <- true
+	go func(batch []types.Metric) {
+		c.collectBatch(ch, batch[:i])
+		<-sem
+	}(batch)
+	for i := 0; i < cap(sem); i++ {
+		sem <- true
+	}
 }
 
 func (c collector) collectMetric(ch chan<- prometheus.Metric, m *types.Metric, value float64) {

@@ -25,6 +25,7 @@ type collector struct {
 	logger log.Logger
 	*reporter
 	descMap      map[string]*prometheus.Desc
+	descLock     sync.Mutex
 	errorCounter prometheus.Counter
 	errDesc      *prometheus.Desc
 	concurrency  int
@@ -107,11 +108,15 @@ func (c collector) collectMetric(ch chan<- prometheus.Metric, m *types.Metric, v
 
 	key := strings.Join(lns, " ")
 	level.Debug(c.logger).Log("msg", "Using key", "key", key)
+	c.descLock.Lock()
 	desc, ok := c.descMap[key]
+	c.descLock.Unlock()
 	if !ok {
 		level.Debug(c.logger).Log("msg", "Key not found, creating new decs")
 		desc = prometheus.NewDesc(namespace+"_"+name, fmt.Sprintf("Cloudwatch Metric %s/%s", *m.Namespace, *m.MetricName), lns, nil)
+		c.descLock.Lock()
 		c.descMap[key] = desc
+		c.descLock.Unlock()
 	}
 	level.Debug(c.logger).Log("msg", "Sending metric", "desc", desc.String(), "lvs", fmt.Sprintf("%+v", lvs), "value", fmt.Sprintf("%f", value))
 	ch <- prometheus.MustNewConstMetric(

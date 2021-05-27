@@ -114,12 +114,13 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
 	}
-	reporter.namespace = namespace
-	reporter.metricName = metricName
+	reporter.namespace = namespace   // FIXME
+	reporter.metricName = metricName // FIXME
 	c := newCollector(logger, reporter, h.errorCounter)
 
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(c)
+	registry.MustRegister(c.metricsGauge) // FIXME
 	promhttp.HandlerFor(registry, promhttp.HandlerOpts{}).ServeHTTP(w, r)
 	h.durationSummary.WithLabelValues(namespace, metricName).Observe(time.Since(start).Seconds())
 }

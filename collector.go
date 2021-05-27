@@ -64,25 +64,29 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 		length = batchSize
 	}
 	var (
-		batch = make([]types.Metric, length, batchSize)
-		i     = 0
-		sem   = make(chan bool, c.concurrency)
+		scratch = make([]types.Metric, length, batchSize)
+		i       = 0
+		sem     = make(chan bool, c.concurrency)
 	)
 	for _, metric := range metrics {
-		batch[i] = metric
+		scratch[i] = metric
 		i++
 		if i < batchSize {
 			continue
 		}
 		i = 0
+		batch := make([]types.Metric, length, batchSize)
 		sem <- true
+		copy(batch, scratch)
 		go func(batch []types.Metric) {
 			c.collectBatch(ch, batch)
 			<-sem
 		}(batch)
 	}
 	// The length of the array might be bigger than the number of entries when processing more than one batch
+	batch := make([]types.Metric, length, batchSize)
 	sem <- true
+	copy(batch, scratch)
 	go func(batch []types.Metric) {
 		c.collectBatch(ch, batch[:i])
 		<-sem

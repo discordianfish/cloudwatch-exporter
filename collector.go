@@ -26,6 +26,7 @@ type collector struct {
 	*reporter
 	descMap      map[string]*prometheus.Desc
 	descLock     sync.Mutex
+	metricsGauge prometheus.Gauge
 	errorCounter prometheus.Counter
 	errDesc      *prometheus.Desc
 	concurrency  int
@@ -33,10 +34,14 @@ type collector struct {
 
 func newCollector(logger log.Logger, reporter *reporter, errorCounter prometheus.Counter) *collector {
 	return &collector{
-		logger:       logger,
-		reporter:     reporter,
-		descMap:      make(map[string]*prometheus.Desc),
-		errDesc:      prometheus.NewDesc("cloudwatch_error", "Error collecting metrics", nil, nil),
+		logger:   logger,
+		reporter: reporter,
+		descMap:  make(map[string]*prometheus.Desc),
+		errDesc:  prometheus.NewDesc("cloudwatch_error", "Error collecting metrics", nil, nil),
+		metricsGauge: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "aws_metrics_collected",
+			Help: "Number of metrics collected during request",
+		}),
 		errorCounter: errorCounter,
 		concurrency:  10,
 	}
@@ -127,6 +132,7 @@ func (c collector) collectMetric(ch chan<- prometheus.Metric, m *types.Metric, v
 		lvs...,
 	)
 	c.descLock.Unlock()
+	c.metricsGauge.Inc()
 }
 
 func sprintDims(ds []types.Dimension) (out string) {

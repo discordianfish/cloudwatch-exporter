@@ -120,7 +120,6 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(c)
-	registry.MustRegister(c.metricsGauge) // FIXME
 	promhttp.HandlerFor(registry, promhttp.HandlerOpts{}).ServeHTTP(w, r)
 	h.durationSummary.WithLabelValues(namespace, metricName).Observe(time.Since(start).Seconds())
 }

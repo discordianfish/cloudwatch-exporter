@@ -70,7 +70,8 @@ func TestCollector(t *testing.T) {
 			t.Logf("Got metric %v", m)
 		}
 
-		if c := len(metrics); c != tc.count {
+		// +1 to account for aws_metrics_collected gauge
+		if c := len(metrics); c != tc.count+1 {
 			t.Fatalf("Expected %d but got %d results", tc.count, c)
 		}
 	}

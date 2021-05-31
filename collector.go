@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/go-kit/kit/log"
@@ -26,7 +27,8 @@ type collector struct {
 	*reporter
 	descMap      map[string]*prometheus.Desc
 	descLock     sync.Mutex
-	metricsGauge prometheus.Gauge
+	metricsDesc  *prometheus.Desc
+	metricsSent  uint64
 	errorCounter prometheus.Counter
 	errDesc      *prometheus.Desc
 	concurrency  int
@@ -34,14 +36,11 @@ type collector struct {
 
 func newCollector(logger log.Logger, reporter *reporter, errorCounter prometheus.Counter) *collector {
 	return &collector{
-		logger:   logger,
-		reporter: reporter,
-		descMap:  make(map[string]*prometheus.Desc),
-		errDesc:  prometheus.NewDesc("cloudwatch_error", "Error collecting metrics", nil, nil),
-		metricsGauge: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "aws_metrics_collected",
-			Help: "Number of metrics collected during request",
-		}),
+		logger:       logger,
+		reporter:     reporter,
+		descMap:      make(map[string]*prometheus.Desc),
+		errDesc:      prometheus.NewDesc("cloudwatch_error", "Error collecting metrics", nil, nil),
+		metricsDesc:  prometheus.NewDesc("aws_metrics_sent", "Number of metrics sent in this scrape", nil, nil),
 		errorCounter: errorCounter,
 		concurrency:  10,
 	}
@@ -99,6 +98,12 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 	for i := 0; i < cap(sem); i++ {
 		sem <- true
 	}
+
+	ch <- prometheus.MustNewConstMetric(
+		c.metricsDesc,
+		prometheus.GaugeValue,
+		float64(atomic.LoadUint64(&c.metricsSent)),
+	)
 }
 
 func (c collector) collectMetric(ch chan<- prometheus.Metric, m *types.Metric, value float64) {
@@ -132,7 +137,7 @@ func (c collector) collectMetric(ch chan<- prometheus.Metric, m *types.Metric, v
 		lvs...,
 	)
 	c.descLock.Unlock()
-	c.metricsGauge.Inc()
+	atomic.AddUint64(&c.metricsSent, 1)
 }
 
 func sprintDims(ds []types.Dimension) (out string) {

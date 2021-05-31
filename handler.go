@@ -55,7 +55,7 @@ func configFromQuery(query url.Values) (*reporterConfig, error) {
 		delayDuration: 600 * time.Second,
 		rangeDuration: 600 * time.Second,
 		period:        60,
-		stat:          "Maximum",
+		stat:          "Average",
 	}
 	for k, v := range query {
 		if len(v) == 0 {

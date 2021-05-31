@@ -47,12 +47,12 @@ func newCollector(logger log.Logger, reporter *reporter, errorCounter prometheus
 }
 
 // Describe implements Prometheus.Collector.
-func (c collector) Describe(ch chan<- *prometheus.Desc) {
+func (c *collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- prometheus.NewDesc("dummy", "dummy", nil, nil)
 }
 
 // Collect implements Prometheus.Collector.
-func (c collector) Collect(ch chan<- prometheus.Metric) {
+func (c *collector) Collect(ch chan<- prometheus.Metric) {
 	metrics, err := c.reporter.ListMetrics()
 	if err != nil {
 		level.Error(c.logger).Log("msg", "failed to list metrics", "err", err)
@@ -106,7 +106,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 	)
 }
 
-func (c collector) collectMetric(ch chan<- prometheus.Metric, m *types.Metric, value float64) {
+func (c *collector) collectMetric(ch chan<- prometheus.Metric, m *types.Metric, value float64) {
 	var (
 		namespace = strcase.SnakeCase(prometheusMetricNameRegexp.ReplaceAllString(*m.Namespace, "_"))
 		name      = strcase.SnakeCase(prometheusMetricNameRegexp.ReplaceAllString(*m.MetricName, "_"))
@@ -147,7 +147,7 @@ func sprintDims(ds []types.Dimension) (out string) {
 	return out
 }
 
-func (c collector) collectBatch(ch chan<- prometheus.Metric, metrics []types.Metric) {
+func (c *collector) collectBatch(ch chan<- prometheus.Metric, metrics []types.Metric) {
 	// FIXME: API call fails when MetricDataQueries is empty but we might
 	// want to avoid that situation in the first place
 	if len(metrics) == 0 {

@@ -116,7 +116,7 @@ func (c *collector) collectMetric(ch chan<- prometheus.Metric, m *types.Metric, 
 	)
 	// FIXME: do we need to sort the keys?
 	for i, d := range m.Dimensions {
-		lns[i] = *d.Name
+		lns[i] = strcase.SnakeCase(*d.Name)
 		lvs[i] = *d.Value
 	}
 

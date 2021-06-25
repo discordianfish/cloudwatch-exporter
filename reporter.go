@@ -79,11 +79,11 @@ func (c *reporter) GetMetricsResults(metrics []types.Metric) ([]types.MetricData
 		metricDataQueries = make([]types.MetricDataQuery, len(metrics))
 	)
 
-	for i, metric := range metrics {
+	for i := range metrics {
 		metricDataQueries[i] = types.MetricDataQuery{
 			Id: aws.String("n" + strconv.Itoa(i)),
 			MetricStat: &types.MetricStat{
-				Metric: &metric,
+				Metric: &metrics[i],
 				Period: &c.config.period,
 				Stat:   &c.config.stat,
 			},

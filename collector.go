@@ -165,10 +165,6 @@ func (c *collector) collectBatch(ch chan<- prometheus.Metric, metrics []types.Me
 	nr := len(results)
 	nm := len(metrics)
 	if nr != nm {
-		namespace := "unknown"
-		if nm > 0 {
-			namespace = *metrics[0].Namespace
-		}
 		level.Error(c.logger).Log("msg", "not same length", "results", nr, "metrics", nm)
 		c.errorCounter.Inc()
 		ch <- prometheus.NewInvalidMetric(c.errDesc, errNotSameLength)

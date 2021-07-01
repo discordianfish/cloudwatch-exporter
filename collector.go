@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -18,6 +19,7 @@ import (
 const batchSize = 500
 
 var (
+	errNotSameLength = errors.New("Metrics returned not same length")
 	// FIXME: technically it may not start with 0-9
 	prometheusMetricNameRegexp = regexp.MustCompile("[^a-zA-Z0-9_:]")
 )
@@ -163,7 +165,10 @@ func (c *collector) collectBatch(ch chan<- prometheus.Metric, metrics []types.Me
 	nr := len(results)
 	nm := len(metrics)
 	if nr != nm {
-		panic(fmt.Sprintf("not same length: %d != %d", nr, nm))
+		level.Error(c.logger).Log("msg", "not same length", "results", nr, "metrics", nm)
+		c.errorCounter.Inc()
+		ch <- prometheus.NewInvalidMetric(c.errDesc, errNotSameLength)
+		return
 	}
 	for _, result := range results {
 		// idx is index in batch

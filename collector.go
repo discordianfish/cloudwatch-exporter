@@ -128,7 +128,8 @@ func (c *collector) collectMetric(ch chan<- prometheus.Metric, m *types.Metric, 
 	desc, ok := c.descMap[key]
 	if !ok {
 		level.Debug(c.logger).Log("msg", "Key not found, creating new decs")
-		desc = prometheus.NewDesc(namespace+"_"+name, fmt.Sprintf("Cloudwatch Metric %s/%s", *m.Namespace, *m.MetricName), lns, nil)
+		statSuffix := strings.ToLower(c.reporter.config.stat)
+		desc = prometheus.NewDesc(namespace+"_"+name+"_"+statSuffix, fmt.Sprintf("Cloudwatch Metric %s/%s", *m.Namespace, *m.MetricName), lns, nil)
 		c.descMap[key] = desc
 	}
 	level.Debug(c.logger).Log("msg", "Sending metric", "desc", desc.String(), "lvs", fmt.Sprintf("%+v", lvs), "value", fmt.Sprintf("%f", value))
